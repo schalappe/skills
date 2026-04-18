@@ -3,134 +3,87 @@ name: product-planning
 description: Use when creating product documentation from scratch, defining product vision, building roadmaps, or documenting tech stack choices. Triggers include "plan a product", "create mission document", "build roadmap", "document tech stack", "define product vision", "start a new project", "greenfield app", "what should I build first", or when a user begins a new project without existing product docs — even if they just say "I want to build something" or "help me plan my app."
 ---
 
-# Product Planning Skill
+# Product Planning
 
-Domain knowledge for systematic product planning and documentation. This skill provides the templates, structures, and quality standards—the `/plan-product` command provides the step-by-step procedure.
+Produce three aligned documents — mission, roadmap, tech stack — before shipping code. Each doc gates the next so the team agrees on *why*, *what*, and *how* in that order.
 
-## Output Structure
-
-Product planning creates three documents:
+## Output structure
 
 ```text
 docs/product/
-├── mission.md      # Product vision, users, problems, differentiators
-├── roadmap.md      # Prioritized feature list with effort estimates
+├── mission.md      # Vision, users, problems, differentiators
+├── roadmap.md      # Prioritized features with effort estimates
 └── tech-stack.md   # Technical choices and constraints
 ```
 
-## Mission Document Structure
+| Doc           | Anchors             | Written before               |
+| ------------- | ------------------- | ---------------------------- |
+| mission.md    | Why / Who / What    | any feature work             |
+| roadmap.md    | Order + effort      | sprint planning              |
+| tech-stack.md | Stack + constraints | first architectural decision |
 
-`docs/product/mission.md` defines the product strategy:
+## Required information
 
-| Section         | Purpose                                     |
-| --------------- | ------------------------------------------- |
-| Pitch           | One-sentence value proposition              |
-| Users           | Primary customers and detailed personas     |
-| The Problem     | Problem statement and solution approach     |
-| Differentiators | Unique advantages over alternatives         |
-| Key Features    | Categorized feature list with user benefits |
+Gather before writing anything:
 
-### Mission Template
+| Input        | Minimum                             |
+| ------------ | ----------------------------------- |
+| Product idea | Core concept and purpose            |
+| Key features | At least 3 with descriptions        |
+| Target users | At least 1 segment with use cases   |
+| Tech stack   | Confirm defaults or list deviations |
 
-The mission document follows this structure: Pitch (one-sentence value prop), Users (segments and detailed personas with pain points/goals), The Problem (statement with quantifiable impact and solution approach), Differentiators (competitive advantages with measurable benefits), and Key Features (categorized by Core/Collaboration/Advanced with user benefit descriptions).
+## Documents
 
-Focus on user benefits over technical implementation. Keep content concise and scannable. Use quantifiable impacts where possible.
+### Mission — `docs/product/mission.md`
 
-For the complete template with placeholder fields, see `references/mission-template.md`.
+Pitch → Users (segments + personas) → Problem (with quantifiable impact) → Differentiators → Key Features (Core / Collaboration / Advanced). Write user benefits, not implementation. Template and section guidance in `references/mission-template.md`.
 
-## Roadmap Structure
+### Roadmap — `docs/product/roadmap.md`
 
-`docs/product/roadmap.md` prioritizes features using the **Onion Layer Philosophy**.
+**Onion-layer ordering:** Foundation → Core → Extended → Advanced. Each layer builds on the previous, and the product must stay functional after every item.
 
-### Onion Layer Philosophy
+Each item: `[#]. [ ] [FEATURE_NAME] — [1–2 sentence description] [EFFORT]` with effort on the XS (1 day) → XL (3+ weeks) scale.
 
-Features are ordered in concentric layers: Foundation (essential infrastructure) → Core (primary user value) → Extended (enhanced capabilities) → Advanced (polish and power features). Each layer builds on the previous, and the product must remain functional after completing any feature. Features deliver user value (user gains a capability or can accomplish a task); technical setup tasks are embedded within the features that need them.
+Constraints:
 
-Each roadmap item follows: `[#]. [ ] [FEATURE_NAME] — [1-2 sentence description] [EFFORT]` with effort estimates from XS (1 day) to XL (3+ weeks).
+- Every item delivers user value, end-to-end (frontend + backend).
+- No bootstrapping or pure-infrastructure tasks — assume a bare-bones app exists.
+- Each item is testable.
 
-For the full onion layer diagram, feature vs. non-feature examples, effort scale, and ordering criteria, see `references/roadmap-guide.md`.
+Full layer diagram, ordering criteria, good/bad examples, and the effort scale in `references/roadmap-guide.md`.
 
-### Roadmap Constraints
+### Tech stack — `docs/product/tech-stack.md`
 
-- Each item must deliver user value (not just technical setup)
-- Each item must be end-to-end functional and testable
-- Product must work after completing each feature
-- Include both frontend and backend when applicable
-- Do NOT include bootstrapping or initialization tasks
-- Assume bare-bones application already exists
+Source priority (highest first): user input → global standards (`~/.claude/CLAUDE.md`) → project docs (`CLAUDE.md`, `package.json`, etc.). Cover frontend, backend, infrastructure, dev tools. Specify versions; explain any non-standard choice. Structure and example in `references/tech-stack-template.md`.
 
-## Tech Stack Document
+## Best practices
 
-`docs/product/tech-stack.md` records technical choices.
+- **Sequential, not parallel.** Finish mission before roadmap; finish roadmap before tech stack. Later docs reference earlier ones.
+- **Confirm between phases.** Don't batch three documents and hope — alignment at each step saves a full rewrite later.
+- **User benefits over implementation.** Especially in mission and roadmap — the reader should see what they can *do*, not how it's built.
+- **Quantify impact.** "Reduces onboarding from 30min to 2min" beats "improves UX".
+- **Prefer defaults.** Use the user's stated stack unless there's a concrete reason to deviate — then document it.
 
-Tech stack choices are gathered from user input (highest priority), global standards (`~/.claude/CLAUDE.md`), and project documentation (`CLAUDE.md`). For the full information source hierarchy and document structure, see `references/tech-stack-template.md`.
+## Common pitfalls
 
-## Required Information
+| Pitfall                           | Fix                                                      |
+| --------------------------------- | -------------------------------------------------------- |
+| Roadmap item is "Set up backend"  | Fold infra into the first feature that needs it          |
+| Mission describes tech, not users | Rewrite from "the user can…" perspective                 |
+| Tech stack lists alternatives     | Pick one; document it; move on                           |
+| Features unordered by dependency  | Reorder by onion layer — foundation items first          |
+| Effort estimates all `M`          | Rescale; a real roadmap spans XS through XL              |
+| Documents drift apart             | Roadmap features must trace to mission's Key Features    |
 
-Before creating documents, gather:
+## References — load on demand
 
-| Required Info | Description                                   |
-| ------------- | --------------------------------------------- |
-| Product Idea  | Core concept and purpose                      |
-| Key Features  | Minimum 3 features with descriptions          |
-| Target Users  | At least 1 user segment with use cases        |
-| Tech Stack    | Confirmation or deviations from default stack |
+| File                                | Load when                                                            |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| `references/mission-template.md`    | writing mission.md — template, section guidance, quality checklist   |
+| `references/roadmap-guide.md`       | writing roadmap.md — onion layers, good/bad examples, validation     |
+| `references/tech-stack-template.md` | writing tech-stack.md — structure, stack patterns, example doc       |
 
-## Best Practices
+## Related commands
 
-### Sequential Execution
-
-- Complete each document fully before proceeding
-- Wait for user confirmation between phases
-- Do not skip ahead or combine phases
-
-### User Alignment
-
-- Ensure documents align with user's standards
-- Reference user's CLAUDE.md for preferences
-- Ask clarifying questions when needed
-
-### Document Quality
-
-- Keep content concise and scannable
-- Focus on "why" over "what"
-- Use clear, actionable language
-- Include quantifiable metrics where possible
-
-## Quality Checklist
-
-Before completing each document:
-
-**Mission:**
-- [ ] Pitch clearly states value proposition
-- [ ] User personas are specific and actionable
-- [ ] Problems include quantifiable impacts
-- [ ] Differentiators show competitive advantage
-- [ ] Features focus on user benefits
-
-**Roadmap:**
-- [ ] Each feature delivers user value (not technical setup)
-- [ ] Features follow onion layer order (foundation → core → extended → polish)
-- [ ] Product remains functional after completing each feature
-- [ ] Each item is end-to-end (frontend + backend + tests)
-- [ ] Effort estimates are realistic
-- [ ] No bootstrapping or infrastructure-only tasks
-
-**Tech Stack:**
-- [ ] User preferences prioritized
-- [ ] All major technology choices documented
-- [ ] Constraints and trade-offs noted
-
-## Additional Resources
-
-### Reference Files
-
-For detailed templates and guidance, consult:
-
-- **`references/mission-template.md`** - Complete mission document examples
-- **`references/roadmap-guide.md`** - Detailed roadmap creation guidance
-- **`references/tech-stack-template.md`** - Tech stack documentation patterns
-
-## Related Commands
-
-- **`/plan-product`** — Creates mission.md, roadmap.md, and tech-stack.md for a new product
+- **`/plan-product`** — step-by-step procedure that drives this skill end-to-end.

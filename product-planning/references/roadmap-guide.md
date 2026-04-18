@@ -11,6 +11,42 @@ A good roadmap:
 - Builds incrementally from MVP to full product
 - Makes each item concrete, testable, and estimable
 
+## Onion Layer Philosophy
+
+Roadmap items live in four concentric layers. Each outer layer assumes the inner one is complete and functional. The product must remain shippable after **every** item, not just at layer boundaries.
+
+```text
+        ┌──────────────────────────────┐
+        │  ADVANCED  (polish, power)   │
+        │  ┌────────────────────────┐  │
+        │  │  EXTENDED  (enhance)   │  │
+        │  │  ┌──────────────────┐  │  │
+        │  │  │  CORE  (value)   │  │  │
+        │  │  │  ┌────────────┐  │  │  │
+        │  │  │  │ FOUNDATION │  │  │  │
+        │  │  │  └────────────┘  │  │  │
+        │  │  └──────────────────┘  │  │
+        │  └────────────────────────┘  │
+        └──────────────────────────────┘
+```
+
+| Layer      | Purpose                                  | Example (task-tracker app)         |
+| ---------- | ---------------------------------------- | ---------------------------------- |
+| Foundation | Essential infra the core feature needs   | User auth, create/read a task      |
+| Core       | Primary user value — the "why you use it" | Edit, complete, delete tasks       |
+| Extended   | Enhanced capabilities that widen appeal  | Due dates, tags, search            |
+| Advanced   | Polish, power features, differentiators  | Recurring tasks, keyboard-only UX  |
+
+**Layer vs. item:** Layers are a sequencing heuristic, not a label you write in the roadmap. An item is still a single feature, not a layer of work.
+
+**Feature vs. non-feature — quick test:** If the roadmap item does not let a user do something new after it ships, it isn't a feature. Infrastructure, refactors, and setup tasks ride along inside the feature that needs them.
+
+| Feature (roadmap-worthy)                       | Non-feature (hide inside a feature) |
+| ---------------------------------------------- | ----------------------------------- |
+| "Users can reset forgotten passwords via email" | "Set up email service"              |
+| "Dashboard shows last 7 days of activity"      | "Configure charting library"        |
+| "Export report as PDF"                         | "Install PDF generation package"    |
+
 ## Step-by-Step Process
 
 ### 1. Review the Mission

@@ -9,8 +9,8 @@ Visual aids help users:
 - **Understand structure** - See how components fit together
 - **Follow flows** - Trace data and process flows
 - **Navigate codebases** - Understand directory organization
-- **Learn faster** - Visual information is processed 60,000x faster than text
-- **Remember better** - People remember 80% of what they see vs 20% of what they read
+- **Learn faster** - Grasp relationships that would take paragraphs to describe
+- **Remember better** - Spatial layout aids recall of structure and flow
 
 ## File Tree Structures
 
@@ -606,22 +606,6 @@ graph TD
 - Not all platforms support it
 
 **When to use:** When your documentation platform supports Mermaid
-
-### Draw.io / Lucidchart (Visual Tools)
-
-**Pros:**
-
-- Professional appearance
-- Easy to create complex diagrams
-- Many templates available
-
-**Cons:**
-
-- Binary files (not version control friendly)
-- Requires separate tool
-- Can become outdated
-
-**When to use:** For complex diagrams or presentations
 
 ## Examples from Real Projects
 

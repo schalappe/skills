@@ -320,64 +320,34 @@ Provide information in multiple formats:
 Last updated: 2024-01-15
 ```
 
-**Mark deprecated features:**
+**Mark deprecated features** with a visible marker at the top of the affected section:
 
-```markdown
-## ⚠️ Deprecated: `legacyAuth()`
+- A heading such as `## Deprecated: legacyAuth()`
+- **Deprecated in:** version the deprecation was announced (e.g., v2.0.0)
+- **Removed in:** version the feature will be removed (e.g., v3.0.0)
+- **Alternative:** what to use instead, with a link to the migration guide
+- A short before/after snippet showing the old and new call
 
-**Deprecated in:** v2.0.0
-**Removed in:** v3.0.0
-**Alternative:** Use `modernAuth()` instead
+**Document breaking changes** with three elements for each change — the old API, the new API, and the migration path:
 
-```javascript
-// ❌ Old way (deprecated)
-await legacyAuth(token);
-
-// ✅ New way
-await modernAuth(token);
-```
-
-```bash
-
-**Document breaking changes:**
-```markdown
-## Breaking Changes in v2.0
-
-### Changed: Authentication method
-
-**Before (v1.x):**
-```javascript
-auth.login(username, password);
-```
-
-**After (v2.x):**
-
-```javascript
-auth.login({ email, password });
-```
-
-**Migration guide:**
-Replace `username` with `email` and wrap parameters in an object.
-```text
+- **Before (v1.x):** `auth.login(username, password)`
+- **After (v2.x):** `auth.login({ email, password })`
+- **Migration:** replace `username` with `email` and pass an object literal
 
 ## Testing Documentation
 
-**Test all code examples:**
-- Verify commands actually work
-- Test setup instructions on clean environment
-- Check that links aren't broken
-- Validate code snippets compile/run
+Test every example you publish:
 
-**Make documentation testable:**
-```markdown
-<!-- Example that can be tested automatically -->
-```bash
-npm install
-npm test
-# Expected output: All tests passed (10 tests)
-```
+- Run each command on a clean environment
+- Verify the documented output matches what you see
+- Check that links still resolve
+- Confirm code snippets compile and pass type checks
 
-```bash
+Make instructions testable by including the expected output, so readers know when the step worked:
+
+    npm install
+    npm test
+    # Expected output: All tests passed (10 tests)
 
 ## Documentation Review Checklist
 

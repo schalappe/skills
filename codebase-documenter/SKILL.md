@@ -1,197 +1,71 @@
 ---
 name: codebase-documenter
-description: Use when documenting a project, writing a README, explaining project structure, creating architecture documentation, adding code comments, or generating API docs. Also applies when documentation needs updating, onboarding materials are needed, or the user asks "how does this codebase work?" — even if they don't explicitly say "documentation."
+description: Create project documentation: READMEs, architecture guides, API references, ADRs, runbooks, onboarding material, CONTRIBUTING guides, module/package overviews, and inline code comments. Use when documenting a project, writing a README, explaining project structure, adding code comments, producing a code walkthrough, or when the user asks "how does this codebase work?" — even without the word "documentation." Out of scope: OpenAPI specs (see openapi-spec-generation) and release notes (see changelog-automation).
 ---
 
 # Codebase Documenter
 
-## Overview
+Produce beginner-friendly documentation for an existing codebase using templates, references, and a repeatable analysis workflow.
 
-This skill enables creating comprehensive, beginner-friendly documentation for codebases. It provides structured templates and best practices for writing READMEs, architecture guides, code comments, and API documentation.
+## Agent workflow
 
-## Core Principles
+### 1. Analyze the codebase
 
-Apply these principles when creating documentation:
+- **Entry points** — Glob `**/index.{ts,js,py}`, `**/main.{ts,js,py}`, `**/app.{ts,js,py}`, `**/server.{ts,js,py}`
+- **Project metadata** — Read `package.json`, `pyproject.toml`, `tsconfig.json`, `Cargo.toml`, `go.mod`, or `Makefile`
+- **Structure** — list the top-level and `src/` directories
+- **Tech stack** — infer from dependencies and framework configs
+- **Existing docs** — Glob `**/*.md` to avoid duplication
 
-1. **Start with "Why"** - Explain purpose before implementation details
-2. **Progressive Disclosure** - Layer information from simple to complex
-3. **Provide Context** - Explain not just what code does, but why it exists
-4. **Include Examples** - Show concrete usage for every concept
-5. **Define Terms** - Avoid jargon; assume no prior knowledge
-6. **Visual Aids** - Use diagrams, flowcharts, and file trees
-7. **Five-Minute Rule** - Enable users to get something running quickly
+For >10 source files or a non-obvious layout, see `references/workflow_procedures.md`.
 
-## Agent Workflow
+### 2. Choose the documentation type
 
-Follow these steps when invoked:
+| Request signal                 | Deliverable                                         |
+| ------------------------------ | --------------------------------------------------- |
+| New project / missing README   | README                                              |
+| Complex module layout or flows | Architecture doc                                    |
+| HTTP endpoints / SDK methods   | API reference                                       |
+| Confusing code sections        | Inline code comments                                |
+| Design decision rationale      | ADR (format in `references/workflow_procedures.md`) |
+| "How does this work?"          | README → Architecture → API → Comments              |
 
-### Step 1: Analyze the Codebase
+### 3. Generate from a template
 
-Before writing any documentation, use tools to understand the project:
+1. Read the matching template from `assets/templates/`
+2. Replace placeholders with real content discovered in step 1
+3. Use concrete examples from the actual project — not generic `foo`/`bar`
+4. Drop irrelevant sections rather than leaving `[placeholder]` text
+5. For diagrams beyond a simple file tree, see `references/visual_aids_guide.md`
+6. Cross-link related docs
 
-1. **Find entry points** — Glob for `**/index.{ts,js,py}`, `**/main.{ts,js,py}`, `**/app.{ts,js,py}`, `**/server.{ts,js,py}`
-2. **Read config files** — Read `package.json`, `pyproject.toml`, `tsconfig.json`, or `Makefile` for project metadata, dependencies, and scripts
-3. **Map directory structure** — List the top-level and `src/` directories to understand organization
-4. **Identify the tech stack** — Check dependencies, framework configs, and language usage
-5. **Review existing docs** — Glob for `**/*.md` to find existing documentation and avoid duplication
+### 4. Review
 
-### Step 2: Choose Documentation Type
+- Makes sense without prior knowledge of the project
+- Setup steps are complete and testable
+- Code examples point to real files in the project
+- Scannable via headings, tables, and file trees — not a wall of text
 
-Select based on the user's request and codebase analysis:
+## Templates
 
-| Request Type                  | Documentation to Create                                  |
-| ----------------------------- | -------------------------------------------------------- |
-| New project or missing README | README documentation                                     |
-| Complex architecture          | Architecture documentation                               |
-| Confusing code sections       | Inline code comments                                     |
-| HTTP endpoints or SDKs        | API documentation                                        |
-| Multiple needs                | Address in order: README → Architecture → API → Comments |
+| Template                                     | Use for                        |
+| -------------------------------------------- | ------------------------------ |
+| `assets/templates/README.template.md`        | Project READMEs                |
+| `assets/templates/ARCHITECTURE.template.md`  | System design, data flow, ADRs |
+| `assets/templates/API.template.md`           | HTTP / SDK references          |
+| `assets/templates/CODE_COMMENTS.template.md` | Inline documentation patterns  |
 
-### Step 3: Generate Documentation
+## References — load on demand
 
-1. Read the appropriate template from `assets/templates/`
-2. Replace placeholders with project-specific content discovered in Step 1
-3. Add concrete examples using real code from the project
-4. Create visual aids (file trees, data flow diagrams) — consult `references/visual_aids_guide.md` for advanced patterns
-5. Remove irrelevant template sections rather than leaving placeholders
-6. Link related documentation together
+Load a reference only when needed. All three live under `references/`.
 
-### Step 4: Review for Clarity
+| File                          | Load when                                                           |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `documentation_guidelines.md` | user asks for style, tone, or review-checklist guidance             |
+| `visual_aids_guide.md`        | the doc needs a diagram beyond a basic file tree                    |
+| `workflow_procedures.md`      | deeper codebase analysis, ADR format, or language-specific comments |
 
-Before finalizing, verify:
+## Related skills
 
-1. Does it make sense without prior knowledge of the project?
-2. Are setup instructions complete and testable?
-3. Do code examples reference real files in the project?
-4. Is information easy to scan and find?
-
-## Documentation Types
-
-### README Documentation
-
-**Create for:** Project root directories, major feature modules, standalone components.
-
-**Essential sections:**
-
-- What this does (1-2 sentences, plain English)
-- Quick start (< 5 minutes to running)
-- Project structure (visual file tree)
-- Key concepts (core abstractions)
-- Common tasks (step-by-step guides)
-- Troubleshooting (common issues and solutions)
-
-**Template:** `assets/templates/README.template.md`
-
-### Architecture Documentation
-
-**Create for:** Projects with multiple modules, complex data flows, or non-obvious design decisions.
-
-**Essential sections:**
-
-- System design (high-level diagram)
-- Directory structure (detailed breakdown)
-- Data flow (how data moves through system)
-- Key design decisions (why choices were made)
-- Module dependencies (how parts interact)
-- Extension points (where to add features)
-
-**Template:** `assets/templates/ARCHITECTURE.template.md`
-
-### API Documentation
-
-**Create for:** HTTP endpoints, SDK methods, public interfaces.
-
-**Essential sections:**
-
-- What it does (plain-English explanation)
-- Endpoint and method
-- Authentication requirements
-- Request format (parameters, body)
-- Response format (success and errors)
-- Working example (curl or SDK)
-- Common errors and solutions
-
-**Template:** `assets/templates/API.template.md`
-
-### Code Comments
-
-**Create for:** Complex logic, non-obvious algorithms, code requiring context.
-
-**Principles:**
-
-- Explain "why" not "what"—code shows what it does
-- Document edge cases and business logic
-- Add examples for complex functions
-- Note gotchas and counterintuitive behavior
-- Keep comments current with code changes
-
-**Examples:** `assets/templates/CODE_COMMENTS.template.md`
-
-## Visual Aids Quick Reference
-
-### File Tree Structures
-
-```text
-project-root/
-├── src/                    # Source code
-│   ├── components/        # Reusable UI components
-│   ├── services/          # Business logic and API calls
-│   └── utils/             # Helper functions
-├── tests/                 # Test files
-└── package.json           # Dependencies and scripts
-```
-
-### Data Flow Diagrams
-
-```text
-User Request Flow:
-[1] components/Form.tsx → [2] services/validation.ts → [3] services/api.ts
-                                                            ↓
-[5] components/Form.tsx ← [4] Database (PostgreSQL)
-```
-
-For comprehensive visual aid patterns, consult `references/visual_aids_guide.md`.
-
-## Output Guidelines
-
-When generating documentation:
-
-1. **Target the audience** - Adjust complexity for beginners vs advanced users
-2. **Use consistent formatting** - Follow markdown conventions
-3. **Test everything** - Verify code snippets and commands work
-4. **Link documents** - Create navigation between related docs
-5. **Keep maintainable** - Documentation should be easy to update
-6. **Add metadata** - Include last updated dates and version info
-
-## Additional Resources
-
-### Templates
-
-| Template                                     | Purpose                                        |
-| -------------------------------------------- | ---------------------------------------------- |
-| `assets/templates/README.template.md`        | Project READMEs with quick start and structure |
-| `assets/templates/ARCHITECTURE.template.md`  | System design and data flow documentation      |
-| `assets/templates/API.template.md`           | API endpoints with examples and error handling |
-| `assets/templates/CODE_COMMENTS.template.md` | Inline documentation patterns                  |
-
-### Reference Files
-
-For detailed guidance, consult:
-
-- **`references/documentation_guidelines.md`** - Comprehensive style guide, writing conventions, testing documentation, accessibility, and maintenance practices
-- **`references/visual_aids_guide.md`** - Detailed patterns for file trees, architecture diagrams, sequence diagrams, state machines, and comparison tables
-- **`references/workflow_procedures.md`** - Step-by-step procedures for codebase analysis, detailed examples for each documentation type, comment patterns by language, and review checklists
-
-Load references when:
-
-- The project has more than 10 source files (use `references/workflow_procedures.md` for analysis patterns)
-- Creating diagrams beyond simple file trees (use `references/visual_aids_guide.md`)
-- Documenting APIs with authentication, pagination, or error handling (use `references/documentation_guidelines.md`)
-- The user requests specific style or formatting guidance
-
-## Related Skills
-
-This skill works in conjunction with:
-
-- **openapi-spec-generation** - OpenAPI specification patterns for API documentation
-- **changelog-automation** - Changelog generation and release notes
+- `openapi-spec-generation` — machine-readable OpenAPI specs
+- `changelog-automation` — release notes and changelog generation

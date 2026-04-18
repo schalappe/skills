@@ -438,29 +438,6 @@ def calculate_compound_interest(
     """
 ```
 
-### Inline Comment Prefixes
-
-Use consistent prefixes to categorize comments:
-
-```python
-# [>]: Business rule - transactions over $10k need review
-if amount > 10000:
-    trigger_compliance_review(transaction)
-
-# [!]: Security - prevent SQL injection via parameterized query
-cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-
-# [~]: Workaround for Safari bug (remove after Safari 16 EOL)
-if is_safari:
-    use_fallback_animation()
-
-# [?]: Consider caching this if performance becomes an issue
-expensive_result = compute_heavy_operation()
-
-# [@]: TODO - implement retry logic for transient failures
-response = external_api.call()
-```
-
 ## Documentation Review Checklist
 
 ### Before Publishing

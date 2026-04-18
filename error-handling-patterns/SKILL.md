@@ -1,233 +1,87 @@
 ---
 name: error-handling-patterns
-description: Use when implementing error handling, designing fault-tolerant systems, adding retry or circuit breaker patterns, creating custom exceptions, or improving error messages — even for simple try-catch questions. Covers exception hierarchies, Result types, circuit breakers, graceful degradation, and error aggregation.
+description: Design error handling and fault tolerance — exception hierarchies, Result/Option types, retries, circuit breakers, error aggregation, graceful degradation. Use when adding try/catch, shaping custom exceptions, hardening external calls, improving error messages, or reviewing error flows — even for a one-line try/catch question.
 ---
 
 # Error Handling Patterns
 
-Build resilient applications with robust error handling strategies that gracefully handle failures and provide excellent debugging experiences.
+Build resilient applications by choosing the right error-handling strategy, preserving context, and failing in ways that are observable and recoverable.
 
-## When to Use This Skill
+## Decision guide
 
-- Implementing error handling in new features
-- Designing error-resilient APIs
-- Improving application reliability
-- Creating better error messages
-- Implementing retry and circuit breaker patterns
-- Handling async/concurrent errors
+| Approach      | Use when                                             | Shape                  |
+| ------------- | ---------------------------------------------------- | ---------------------- |
+| Exceptions    | Unexpected conditions that propagate up naturally    | `try` / `catch`        |
+| Result types  | Expected failures that belong in the function's type | `Result<T, E>`         |
+| Option/Maybe  | Absence is normal, not an error                      | `Option<T>` / nullable |
+| Panic / abort | Unrecoverable programmer bugs, broken invariants     | `panic!`, `assert`     |
 
-## Core Concepts
+## Error categories
 
-### Error Handling Philosophies
+- **Recoverable** — network timeouts, missing files, bad user input, rate limits. Retry, validate, or fall back.
+- **Unrecoverable** — OOM, stack overflow, invariant violations. Let the process die with a clear message.
 
-| Approach | Use Case | Example |
-|----------|----------|---------|
-| Exceptions | Unexpected errors, exceptional conditions | try-catch blocks |
-| Result Types | Expected errors, validation failures | `Result<T, E>` |
-| Option/Maybe | Nullable values, optional returns | `Option<T>` |
-| Panics/Crashes | Unrecoverable errors, programming bugs | `panic!()` |
+## Core patterns
 
-### Error Categories
+Sketches below — full code lives in the references.
 
-**Recoverable Errors:**
-- Network timeouts
-- Missing files
-- Invalid user input
-- API rate limits
+### Custom exception hierarchy
 
-**Unrecoverable Errors:**
-- Out of memory
-- Stack overflow
-- Programming bugs (null pointer, etc.)
+One base exception per application; subclass per domain concern; attach `code`, `details`, and a timestamp so handlers branch on type instead of matching on message strings.
 
-## Quick Reference: Exception Hierarchy
+### Retry with exponential backoff
 
-```python
-class ApplicationError(Exception):
-    """Base exception for all application errors."""
-    def __init__(self, message: str, code: str = None, details: dict = None):
-        super().__init__(message)
-        self.code = code
-        self.details = details or {}
+Retry only idempotent operations or well-known transient failures. Cap attempts, multiply delay (`backoff_factor ** attempt`), add jitter to avoid thundering herds. See `references/resilience.md`.
 
-class ValidationError(ApplicationError):
-    """Raised when validation fails."""
-    pass
+### Circuit breaker
 
-class NotFoundError(ApplicationError):
-    """Raised when resource not found."""
-    pass
+Three states — CLOSED / OPEN / HALF_OPEN — short-circuit calls to a failing dependency and probe recovery on a timer. Wrap every external service call on a hot path. See `references/resilience.md`.
 
-class ExternalServiceError(ApplicationError):
-    """Raised when external service fails."""
-    pass
-```
+### Error aggregation
 
-## Universal Patterns
+Collect failures across a batch (form fields, bulk operations) and raise a single `AggregateError` so callers see everything at once. See `references/resilience.md`.
 
-### Pattern 1: Retry with Exponential Backoff
+### Graceful degradation
 
-```python
-def retry(max_attempts: int = 3, backoff_factor: float = 2.0):
-    """Retry decorator with exponential backoff and jitter."""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    if attempt < max_attempts - 1:
-                        delay = backoff_factor ** attempt
-                        jitter = random.uniform(0, delay * 0.5)
-                        time.sleep(delay + jitter)
-                        continue
-                    raise
-        return wrapper
-    return decorator
-```
+On failure, serve a reduced but useful response (cached copy, empty list, feature flag off). Log the degradation so silent fallback doesn't become permanent invisible behavior.
 
-### Pattern 2: Circuit Breaker
+### Result type
 
-Prevent cascading failures in distributed systems.
+Make failure part of the return type, not a control-flow side channel. Forces callers to handle the error branch. See `references/typescript.md` or `references/rust.md`.
 
-```python
-class CircuitBreaker:
-    """Three states: CLOSED (normal), OPEN (failing), HALF_OPEN (testing)."""
+## Best practices
 
-    def call(self, func):
-        if self.state == CircuitState.OPEN:
-            if self._timeout_expired():
-                self.state = CircuitState.HALF_OPEN
-            else:
-                raise CircuitOpenError()
+- **Fail fast** at boundaries (user input, external APIs); trust internal callers.
+- **Preserve context** — chain causes (`raise ... from e`, `%w`, `.cause`), include request/user IDs.
+- **Catch narrowly** — specific exception types, never bare `except:` / `catch (e)`.
+- **Handle at the right layer** — the layer that can actually do something about it.
+- **Clean up** — context managers, `defer`, `try/finally`, RAII.
+- **Log once** — either log or re-throw, not both.
+- **Meaningful messages** — what happened, which input, what to try next.
 
-        try:
-            result = func()
-            self._on_success()
-            return result
-        except Exception:
-            self._on_failure()
-            raise
-```
+## Common pitfalls
 
-### Pattern 3: Error Aggregation
+| Pitfall                       | Fix                                            |
+| ----------------------------- | ---------------------------------------------- |
+| `except Exception` catch-all  | Narrow to the exact types you expect          |
+| Empty catch block             | Log, re-throw, or document why silence is safe |
+| Log + re-throw at every frame | Log once at the boundary that renders the error |
+| Swallowed async rejections    | `await`, `.catch()`, or `Promise.allSettled`  |
+| Generic "An error occurred"   | Include operation, inputs, and next step       |
+| Resource leaks on error path  | Context managers / defer / finally            |
 
-Collect multiple errors instead of failing on first error.
+## References — load on demand
 
-```typescript
-class ErrorCollector {
-  private errors: Error[] = [];
+| File                         | Load when                                                          |
+| ---------------------------- | ------------------------------------------------------------------ |
+| `references/resilience.md`   | implementing retry, circuit breaker, aggregation, or fallback      |
+| `references/python.md`       | Python exception hierarchies, context managers, cause chaining     |
+| `references/typescript.md`   | Result types, custom Error classes, async boundary handlers        |
+| `references/rust.md`         | custom error enums, `thiserror`/`anyhow`, `?` and combinators      |
+| `references/go.md`           | sentinel errors, `errors.Is/As`, `%w` wrapping, `errgroup`         |
 
-  add(error: Error): void {
-    this.errors.push(error);
-  }
+## Related skills
 
-  hasErrors(): boolean {
-    return this.errors.length > 0;
-  }
-
-  throw(): never {
-    throw new AggregateError(this.errors, `${this.errors.length} errors`);
-  }
-}
-
-// Usage: Validate all fields before failing
-function validateUser(data: any): User {
-  const errors = new ErrorCollector();
-  if (!data.email) errors.add(new ValidationError("Email required"));
-  if (!data.name) errors.add(new ValidationError("Name required"));
-  if (errors.hasErrors()) errors.throw();
-  return data as User;
-}
-```
-
-### Pattern 4: Graceful Degradation
-
-Provide fallback functionality when errors occur.
-
-```python
-def with_fallback(primary, fallback, log_error=True):
-    """Try primary function, fall back on error."""
-    try:
-        return primary()
-    except Exception as e:
-        if log_error:
-            logger.error(f"Primary failed: {e}")
-        return fallback()
-
-# Usage
-def get_user_profile(user_id: str):
-    return with_fallback(
-        primary=lambda: fetch_from_cache(user_id),
-        fallback=lambda: fetch_from_database(user_id)
-    )
-```
-
-### Pattern 5: Result Type (TypeScript)
-
-```typescript
-type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
-
-function Ok<T>(value: T): Result<T, never> {
-  return { ok: true, value };
-}
-
-function Err<E>(error: E): Result<never, E> {
-  return { ok: false, error };
-}
-
-// Usage
-function parseJSON<T>(json: string): Result<T, SyntaxError> {
-  try {
-    return Ok(JSON.parse(json) as T);
-  } catch (error) {
-    return Err(error as SyntaxError);
-  }
-}
-```
-
-## Best Practices
-
-1. **Fail Fast**: Validate input early, fail quickly
-2. **Preserve Context**: Include stack traces, metadata, timestamps
-3. **Meaningful Messages**: Explain what happened and how to fix it
-4. **Log Appropriately**: Error = log, expected failure = don't spam logs
-5. **Handle at Right Level**: Catch where you can meaningfully handle
-6. **Clean Up Resources**: Use try-finally, context managers, defer
-7. **Don't Swallow Errors**: Log or re-throw, don't silently ignore
-8. **Type-Safe Errors**: Use typed errors when possible
-
-## Common Pitfalls
-
-| Pitfall | Problem | Solution |
-|---------|---------|----------|
-| Catching too broadly | `except Exception` hides bugs | Catch specific exceptions |
-| Empty catch blocks | Silently swallowing errors | Log or re-throw |
-| Logging and re-throwing | Duplicate log entries | Log at one level only |
-| Not cleaning up | Resource leaks | Use context managers, defer |
-| Poor error messages | "Error occurred" unhelpful | Include context and action |
-| Ignoring async errors | Unhandled promise rejections | Use .catch() or try-catch |
-
-## Implementation Checklist
-
-When implementing error handling:
-
-- [ ] Define custom exception hierarchy for application
-- [ ] Use specific exception types, not generic Exception
-- [ ] Include error codes for programmatic handling
-- [ ] Add context (user_id, request_id, etc.) to errors
-- [ ] Implement retry logic for transient failures
-- [ ] Add circuit breakers for external services
-- [ ] Provide graceful degradation where possible
-- [ ] Validate at system boundaries (input, external APIs)
-- [ ] Clean up resources in finally blocks
-- [ ] Log errors with appropriate level and context
-
-## Additional Resources
-
-### Reference Files
-
-For detailed language-specific patterns, consult:
-
-- **`references/patterns-by-language.md`** - Python, TypeScript, Rust, and Go error handling patterns with full code examples
+- `debugging-strategies` — investigate errors that escape handling
+- `logging-standards` — structured logging so errors stay traceable
+- `microservices-patterns` — bulkheads, timeouts, resilience across services

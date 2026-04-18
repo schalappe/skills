@@ -1,218 +1,91 @@
 ---
 name: debugging-strategies
-description: Use when the user needs debugging methodologies, tool configurations, profiling setup, or systematic debugging approaches. Covers binary search, differential debugging, language-specific tools, and profiling. For active bug investigation in the current session, prefer the systematic-debugging skill instead.
+description: Use when debugging bugs, investigating crashes, tracking regressions, profiling performance, hunting memory leaks, or analyzing stack traces — even without the word "debug." Covers the scientific method, binary search, differential debugging, language-specific debuggers (JS/TS, Python, Go, Rust), profilers, and safe production investigation.
 ---
 
 # Debugging Strategies
 
-Transform debugging from frustrating guesswork into systematic problem-solving with proven strategies, powerful tools, and methodical approaches.
+Turn elusive bugs into systematic problem-solving with reproducible steps, differential analysis, and the right language-specific tool.
 
-## When to Use This Skill
+## Agent workflow
 
-- Tracking down elusive bugs
-- Investigating performance issues
-- Understanding unfamiliar codebases
-- Debugging production issues
-- Analyzing crash dumps and stack traces
-- Profiling application performance
-- Investigating memory leaks
+### 1. Reproduce
 
-## Core Principles
+- Can you trigger it on demand? If not, make it reproducible first — randomness usually means you don't yet understand it
+- Shrink to a minimal case: smallest input, fewest dependencies, shortest code path
+- Record exact steps, environment details, and full error output
 
-### The Scientific Method
+### 2. Gather
 
-1. **Observe**: What's the actual behavior?
-2. **Hypothesize**: What could be causing it?
-3. **Experiment**: Test your hypothesis
-4. **Analyze**: Did it prove/disprove your theory?
-5. **Repeat**: Until you find the root cause
+| Category       | Collect                                                  |
+| -------------- | -------------------------------------------------------- |
+| Error output   | Full stack trace, error codes, console/server logs       |
+| Environment    | OS, language/runtime version, dependency versions        |
+| Recent changes | `git log` since last known-good, deployment timeline     |
+| Scope          | All users? All browsers? Production only? Specific data? |
 
-### Debugging Mindset
+### 3. Hypothesize
 
-**Don't Assume:**
-- "It can't be X" - Yes it can
-- "I didn't change Y" - Check anyway
-- "It works on my machine" - Find out why
+Frame a testable theory:
 
-**Do:**
-- Reproduce consistently
-- Isolate the problem
-- Keep detailed notes
-- Question everything
-- Take breaks when stuck
+- What differs between working and broken? (see *differential debugging* below)
+- What's the smallest input that could trigger this?
+- Which layer could fail — input validation, business logic, data, external service?
 
-## Systematic Process
+Articulate expected vs actual behavior out loud or in writing. Forcing precise language often exposes the wrong assumption ("explain-to-discover").
 
-### Phase 1: Reproduce
+### 4. Test & verify
 
-1. **Can you reproduce it?** - Always? Sometimes? Randomly?
-2. **Create minimal reproduction** - Simplify to smallest example
-3. **Document steps** - Exact steps, environment details, error messages
+| Strategy              | When to use                                                     |
+| --------------------- | --------------------------------------------------------------- |
+| Binary search         | Comment out half; for regressions use `git bisect`              |
+| Add instrumentation   | Log values, trace execution, measure timing                     |
+| Isolate components    | Run each piece standalone, mock dependencies                    |
+| Differential analysis | Diff working vs broken: config, env, data, user, concurrency    |
+| Confirm + clean up    | Write a test that would have caught it, then remove scaffolding |
 
-### Phase 2: Gather Information
+## Techniques
 
-| Category | What to Collect |
-|----------|-----------------|
-| Error Messages | Full stack trace, error codes, console output |
-| Environment | OS, language version, dependencies |
-| Recent Changes | Git history, deployment timeline, config changes |
-| Scope | Affects all users? All browsers? Production only? |
+### Binary search
 
-### Phase 3: Form Hypothesis
+For code regressions, use `git bisect` to automate the search — see the `git-advanced-workflows` skill for the full workflow. For live code paths, comment out or feature-flag half the suspect code and narrow iteratively.
 
-Ask:
-- What changed recently?
-- What's different between working and broken?
-- Where could this fail? (input validation, business logic, data layer, external services)
+### Differential debugging
 
-### Phase 4: Test & Verify
+Compare working vs broken across: runtime/version, data shape, user role, time of day, deployment target, concurrency level. A single diff often points straight at the cause.
 
-| Strategy | When to Use |
-|----------|-------------|
-| Binary Search | Comment out half the code, narrow down |
-| Add Logging | Track variable values, trace execution flow |
-| Isolate Components | Test each piece separately, mock dependencies |
-| Compare Working vs Broken | Diff configurations, environments, data |
+### Explain-to-discover
 
-## Debugging Techniques
+State the expected behavior, then narrate the actual execution step-by-step. The assumption you glossed over usually falls out.
 
-### Technique 1: Binary Search Debugging
+## Mindset
 
-```bash
-# Git bisect for finding regression
-git bisect start
-git bisect bad                    # Current commit is bad
-git bisect good v1.0.0            # v1.0.0 was good
+- "It can't be X" — yes it can. Verify.
+- "I didn't change Y" — check the diff anyway.
+- "Works on my machine" — find the difference.
+- Change one thing at a time. Multiple simultaneous changes make cause-and-effect invisible.
 
-# Git checks out middle commit - test it
-# Then mark as good or bad
-git bisect good   # if it works
-git bisect bad    # if it's broken
+## By issue type
 
-# Continue until bug found
-git bisect reset  # when done
+| Issue           | First move                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------- |
+| Intermittent    | Stress-test in a loop; log timing and state transitions; suspect race conditions or ordering            |
+| Performance     | Profile before optimizing — see [profiling.md](references/profiling.md)                                 |
+| Production-only | Gather evidence without mutating prod — see [production-debugging.md](references/production-debugging.md) |
+| Query slowness  | `EXPLAIN ANALYZE` first — see [data-layer-debugging.md](references/data-layer-debugging.md)             |
+| Memory leak    | Heap snapshots + allocation profiling — see [profiling.md](references/profiling.md)                     |
 
-# Automated version
-git bisect start HEAD v1.0.0
-git bisect run npm test
-```
+## References — load on demand
 
-### Technique 2: Differential Debugging
+| File                                                          | Load when                                                               |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [language-debuggers.md](references/language-debuggers.md)     | setting up a debugger or IDE launch config for JS/TS, Python, Go, Rust  |
+| [profiling.md](references/profiling.md)                       | investigating CPU hotspots, memory pressure, or slow response times     |
+| [data-layer-debugging.md](references/data-layer-debugging.md) | debugging slow SQL queries or inspecting HTTP request/response bodies   |
+| [production-debugging.md](references/production-debugging.md) | investigating a live production incident safely                         |
 
-Compare working vs broken:
+## Related skills
 
-| Aspect | Working | Broken |
-|--------|---------|--------|
-| Environment | Development | Production |
-| Node version | 18.16.0 | 18.15.0 |
-| Data | Empty DB | 1M records |
-| User | Admin | Regular user |
-| Time | During day | After midnight |
-
-### Technique 3: Explain-to-Discover
-
-Articulate the problem step-by-step — describe what the code should do, then what it actually does. Walk through the execution path out loud or in writing. Forcing precise explanation often exposes the faulty assumption.
-
-## Debugging by Issue Type
-
-### Intermittent Bugs
-
-1. **Add extensive logging** - timing, state transitions, external interactions
-2. **Look for race conditions** - concurrent access, async timing
-3. **Check timing dependencies** - setTimeout, Promise order, animation frames
-4. **Stress test** - Run many times, vary timing, simulate load
-
-### Performance Issues
-
-1. **Profile first** - Don't optimize blindly
-2. **Common culprits** - N+1 queries, unnecessary re-renders, large data processing, synchronous I/O
-3. **Measure before and after** - Verify improvement
-
-### Production Bugs
-
-1. **Gather evidence** - Error tracking, logs, user reports, metrics
-2. **Reproduce locally** - Use production data (anonymized), match environment
-3. **Safe investigation** - Don't change production, use feature flags
-
-## Quick Debugging Checklist
-
-When stuck, check:
-
-- [ ] Spelling errors (typos in variable names)
-- [ ] Case sensitivity (fileName vs filename)
-- [ ] Null/undefined values
-- [ ] Array index off-by-one
-- [ ] Async timing (race conditions)
-- [ ] Scope issues (closure, hoisting)
-- [ ] Type mismatches
-- [ ] Missing dependencies
-- [ ] Environment variables
-- [ ] File paths (absolute vs relative)
-- [ ] Cache issues (clear cache)
-- [ ] Stale data (refresh database)
-
-## Language Quick Reference
-
-### JavaScript/TypeScript
-
-```typescript
-debugger;                         // Pause execution
-console.log("Value:", value);     // Basic logging
-console.table(arrayOfObjects);    // Table format
-console.time("op"); /* code */ console.timeEnd("op");  // Timing
-console.trace();                  // Stack trace
-```
-
-### Python
-
-```python
-breakpoint()                      # Python 3.7+ debugger
-import pdb; pdb.set_trace()      # Traditional debugger
-import pdb; pdb.post_mortem()    # Debug at exception point
-
-# Profiling
-import cProfile
-cProfile.run('slow_function()', 'profile_stats')
-```
-
-### Go
-
-```go
-import "runtime/debug"
-debug.PrintStack()               // Print stack trace
-
-// Profile endpoint
-import _ "net/http/pprof"
-// Visit http://localhost:6060/debug/pprof/
-```
-
-## Common Debugging Mistakes
-
-| Mistake | Better Approach |
-|---------|-----------------|
-| Making multiple changes | Change one thing at a time |
-| Not reading error messages | Read the full stack trace |
-| Assuming it's complex | Often it's simple |
-| Debug logging in prod | Remove before shipping |
-| Not using debugger | console.log isn't always best |
-| Giving up too soon | Persistence pays off |
-| Not testing the fix | Verify it actually works |
-
-## Best Practices
-
-1. **Reproduce First** - Can't fix what you can't reproduce
-2. **Isolate the Problem** - Remove complexity until minimal case
-3. **Read Error Messages** - They're usually helpful
-4. **Check Recent Changes** - Most bugs are recent
-5. **Use Version Control** - Git bisect, blame, history
-6. **Take Breaks** - Fresh eyes see better
-7. **Document Findings** - Help future you
-8. **Fix Root Cause** - Not just symptoms
-
-## Additional Resources
-
-### Reference Files
-
-For detailed tool configurations and profiling guides:
-
-- **`references/tools-guide.md`** - Complete debugging tool guide for JavaScript, Python, Go, and Rust including VS Code configuration and profilers
+- `git-advanced-workflows` — `git bisect`, reflog recovery, history archaeology
+- `logging-standards` — what to log so bugs are traceable after the fact
+- `error-handling-patterns` — prevent bugs that need debugging in the first place

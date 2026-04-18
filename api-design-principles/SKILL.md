@@ -1,219 +1,85 @@
 ---
 name: api-design-principles
-description: Use when designing REST or GraphQL APIs, building API endpoints, structuring routes, designing request/response schemas, choosing between REST and GraphQL, implementing pagination or filtering, reviewing API specifications, or planning API versioning — even if the user doesn't explicitly say "API design."
+description: Guides the design of REST and GraphQL APIs including resource modeling, pagination, error handling, authentication, webhooks, and async patterns. Use when designing endpoints, structuring routes, shaping request/response schemas, choosing REST vs GraphQL, implementing pagination or filtering, planning versioning, adding authentication, designing webhooks or async APIs, or reviewing an API specification — even if the user doesn't explicitly say "API design."
 ---
 
 # API Design Principles
 
-Design intuitive, scalable REST and GraphQL APIs using resource-oriented patterns, proper HTTP semantics, and consistent error handling.
+Design intuitive, scalable REST and GraphQL APIs using resource-oriented patterns, proper HTTP semantics, consistent error handling, and secure authentication.
 
-## Core Concepts
+## Quick start
 
-### 1. RESTful Design Principles
-
-- Resources are nouns (users, orders, products), not verbs
-- Use HTTP methods for actions: GET (retrieve, idempotent), POST (create), PUT (replace, idempotent), PATCH (partial update), DELETE (remove, idempotent)
-- URLs represent resource hierarchies
-- Consistent naming conventions (plural nouns for collections)
-
-### 2. GraphQL Design Principles
-
-- Types define your domain model (schema-first development)
-- Queries for reading, mutations for modifying, subscriptions for real-time
-- Clients request exactly what they need from a single endpoint
-- Strongly typed schema with built-in introspection
-
-### 3. API Versioning Strategies
-
-**URL Versioning:**
+REST resource shape — nouns, plural, method-driven:
 
 ```text
-/api/v1/users
-/api/v2/users
+GET    /api/users          # List (paginated)
+POST   /api/users          # Create
+GET    /api/users/{id}     # Read
+PATCH  /api/users/{id}     # Partial update
+DELETE /api/users/{id}     # Remove
 ```
 
-**Header Versioning:**
+GraphQL mutation shape — Input/Payload pattern:
 
-```text
-Accept: application/vnd.api+json; version=1
-```
-
-**Query Parameter Versioning:**
-
-```text
-/api/users?version=1
-```
-
-## REST API Design Patterns
-
-### Pattern 1: Resource Collection Design
-
-```python
-# Good: Resource-oriented endpoints
-GET    /api/users              # List users (with pagination)
-POST   /api/users              # Create user
-GET    /api/users/{id}         # Get specific user
-PUT    /api/users/{id}         # Replace user
-PATCH  /api/users/{id}         # Update user fields
-DELETE /api/users/{id}         # Delete user
-
-# Nested resources
-GET    /api/users/{id}/orders  # Get user's orders
-POST   /api/users/{id}/orders  # Create order for user
-
-# Bad: Action-oriented endpoints (avoid)
-POST   /api/createUser
-POST   /api/getUserById
-POST   /api/deleteUser
-```
-
-### Pattern 2: Pagination and Filtering
-
-Use offset-based pagination for simple cases and cursor-based pagination for large or real-time datasets.
-Always enforce a default page size and a maximum page size.
-See `references/rest-best-practices.md` for complete pagination patterns including offset-based, cursor-based, and Link header approaches.
-
-### Pattern 3: Error Handling and Status Codes
-
-```python
-from fastapi import HTTPException, status
-from pydantic import BaseModel
-
-class ErrorResponse(BaseModel):
-    error: str
-    message: str
-    details: Optional[dict] = None
-    timestamp: str
-    path: str
-
-class ValidationErrorDetail(BaseModel):
-    field: str
-    message: str
-    value: Any
-
-# Consistent error responses
-STATUS_CODES = {
-    "success": 200,
-    "created": 201,
-    "no_content": 204,
-    "bad_request": 400,
-    "unauthorized": 401,
-    "forbidden": 403,
-    "not_found": 404,
-    "conflict": 409,
-    "unprocessable": 422,
-    "internal_error": 500
+```graphql
+type Mutation {
+  createUser(input: CreateUserInput!): CreateUserPayload!
 }
-
-def raise_not_found(resource: str, id: str):
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={
-            "error": "NotFound",
-            "message": f"{resource} not found",
-            "details": {"id": id}
-        }
-    )
-
-def raise_validation_error(errors: List[ValidationErrorDetail]):
-    raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail={
-            "error": "ValidationError",
-            "message": "Request validation failed",
-            "details": {"errors": [e.dict() for e in errors]}
-        }
-    )
-
-# Example usage
-@app.get("/api/users/{user_id}")
-async def get_user(user_id: str):
-    user = await fetch_user(user_id)
-    if not user:
-        raise_not_found("User", user_id)
-    return user
 ```
 
-### Pattern 4: HATEOAS (Hypermedia as the Engine of Application State)
+## Core concepts
 
-```python
-class UserResponse(BaseModel):
-    id: str
-    name: str
-    email: str
-    _links: dict
+- **REST**: resources are nouns, HTTP methods drive actions, URLs model hierarchies, responses stateless.
+- **GraphQL**: schema-first; queries, mutations, subscriptions over a single endpoint; strongly typed; clients request exactly what they need.
+- **Versioning**: URL (`/v1/`), header (`Accept: ...; version=1`), or query (`?version=1`). Pick one and commit.
 
-    @classmethod
-    def from_user(cls, user: User, base_url: str):
-        return cls(
-            id=user.id,
-            name=user.name,
-            email=user.email,
-            _links={
-                "self": {"href": f"{base_url}/api/users/{user.id}"},
-                "orders": {"href": f"{base_url}/api/users/{user.id}/orders"},
-                "update": {
-                    "href": f"{base_url}/api/users/{user.id}",
-                    "method": "PATCH"
-                },
-                "delete": {
-                    "href": f"{base_url}/api/users/{user.id}",
-                    "method": "DELETE"
-                }
-            }
-        )
-```
+## Decision guide
 
-## GraphQL Design Patterns
+| Need | Pattern |
+|------|---------|
+| CRUD over discrete resources | REST |
+| Complex graph traversal, many clients | GraphQL |
+| Fire-and-forget event delivery | Webhooks |
+| Long-running jobs | Async (202 Accepted + polling or callback) |
+| Bandwidth-sensitive clients | GraphQL or REST sparse fieldsets |
 
-GraphQL APIs follow a schema-first approach where types define the domain model. Key patterns:
+## Patterns at a glance
 
-- **Schema design**: Define types, queries, mutations, and subscriptions. Use Relay-style cursor pagination for connections. See `references/graphql-schema-design.md` for complete schema patterns.
-- **Resolver design**: Resolve fields with async functions. Use Input/Payload pattern for mutations (accept `CreateXInput`, return `CreateXPayload` with optional errors).
-- **DataLoader**: Batch and cache data fetches to prevent the N+1 query problem. Every relationship field should use a DataLoader.
+- **Collection design**: plural nouns, shallow nesting (max 2 levels), consistent casing.
+- **Pagination**: offset for simple; cursor for large/real-time. Enforce default and max page size.
+- **Errors**: structured JSON with `code`, `message`, `details`, `path`, `timestamp`. See `references/rest-best-practices.md`.
+- **Status codes**: 2xx success, 4xx client, 5xx server. Use 401 vs 403 correctly; 422 for validation.
+- **HATEOAS**: embed `_links` for discoverability. See `references/rest-best-practices.md`.
+- **Authentication**: Bearer tokens (JWT) or API keys; enforce object-level auth. See `references/auth-and-security.md`.
+- **Webhooks & async**: signed deliveries, idempotent receivers, exponential retry, 202 Accepted for long jobs. See `references/webhooks-and-async.md`.
 
-For resolver implementation, DataLoader setup, and complete schema examples, see `references/graphql-schema-design.md`.
+## Best practices
 
-## Best Practices
+- **REST**: plural nouns, stateless, correct status codes, versioned, paginated, rate-limited, OpenAPI-documented.
+- **GraphQL**: schema-first, DataLoader for every relationship, Input/Payload for mutations, cursor pagination (Relay), `@deprecated` for evolution.
+- **Security**: validate at boundaries, enforce object-level authorization, HTTPS only, no secrets in URLs, rate-limit per principal, rotate keys.
 
-### REST APIs
+## Common pitfalls
 
-1. **Consistent Naming**: Use plural nouns for collections (`/users`, not `/user`)
-2. **Stateless**: Each request contains all necessary information
-3. **Use HTTP Status Codes Correctly**: 2xx success, 4xx client errors, 5xx server errors
-4. **Version Your API**: Plan for breaking changes from day one
-5. **Pagination**: Always paginate large collections
-6. **Rate Limiting**: Protect your API with rate limits
-7. **Documentation**: Use OpenAPI/Swagger for interactive docs
-
-### GraphQL APIs
-
-1. **Schema First**: Design schema before writing resolvers
-2. **Avoid N+1**: Use DataLoaders for efficient data fetching
-3. **Input Validation**: Validate at schema and resolver levels
-4. **Error Handling**: Return structured errors in mutation payloads
-5. **Pagination**: Use cursor-based pagination (Relay spec)
-6. **Deprecation**: Use `@deprecated` directive for gradual migration
-7. **Monitoring**: Track query complexity and execution time
-
-## Common Pitfalls
-
-- **Over-fetching/Under-fetching (REST)**: Fixed in GraphQL but requires DataLoaders
-- **Breaking Changes**: Version APIs or use deprecation strategies
-- **Inconsistent Error Formats**: Standardize error responses
-- **Missing Rate Limits**: APIs without limits are vulnerable to abuse
-- **Poor Documentation**: Undocumented APIs frustrate developers
-- **Ignoring HTTP Semantics**: POST for idempotent operations breaks expectations
-- **Tight Coupling**: API structure shouldn't mirror database schema
+- Action-oriented URLs (`/createUser`) — use resources instead.
+- Inconsistent error formats across endpoints.
+- Missing rate limits → abuse vector.
+- N+1 queries in GraphQL without DataLoader.
+- Breaking changes without versioning or deprecation.
+- Mirroring DB schema in API → tight coupling.
+- Webhook receivers that aren't idempotent → duplicated side effects on retry.
+- Authorization checked at controller but not object level (IDOR).
 
 ## Resources
 
-- **`references/rest-best-practices.md`**: Comprehensive REST API design guide
-- **`references/graphql-schema-design.md`**: GraphQL schema patterns and anti-patterns
-- **`assets/rest-api-template.py`**: FastAPI REST API template
-- **`assets/api-design-checklist.md`**: Pre-implementation review checklist
+- `references/rest-best-practices.md` — URLs, pagination, error format, caching, bulk operations
+- `references/graphql-schema-design.md` — schemas, resolvers, DataLoader, error unions
+- `references/auth-and-security.md` — OAuth2/JWT, API keys, RBAC, OWASP API Top 10
+- `references/webhooks-and-async.md` — webhook signing, 202 Accepted, idempotency, retries
+- `assets/rest-api-template.py` — FastAPI template with auth, pagination, middleware
+- `assets/api-design-checklist.md` — pre-implementation review checklist
 
-## Related Skills
+## Related skills
 
-- **microservices-patterns**: When your API serves a microservices architecture — covers service decomposition, inter-service communication, and resilience patterns
-- **saga-orchestration**: When your API triggers distributed transactions across multiple services — covers orchestration and choreography patterns with compensating actions
+- **microservices-patterns**: service decomposition, inter-service communication, resilience
+- **saga-orchestration**: distributed transactions with compensating actions

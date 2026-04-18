@@ -1,286 +1,95 @@
 ---
 name: microservices-patterns
-description: Use when splitting an application into services, decomposing a monolith, choosing communication patterns between services, implementing API gateways, handling distributed failures, designing event-driven architectures, or working with service discovery — even if the user just says their app is "getting too big" or asks about "handling failures between services."
+description: Design and evolve service-oriented systems — decomposition, inter-service communication, data isolation, resilience, and observability. Use when splitting an application into services, decomposing a monolith, choosing sync vs async communication, implementing an API gateway or service mesh, handling distributed failures, designing event-driven flows, or working with service discovery — even if the user just says their app is "getting too big" or asks how to "handle failures between services."
 ---
 
 # Microservices Patterns
 
-Apply microservices architecture patterns for service decomposition, inter-service communication, data isolation, and resilience in distributed systems.
+Apply service-oriented patterns for decomposition, communication, data ownership, resilience, and observability in distributed systems.
 
-## Core Concepts
+## Decision guide
 
-### 1. Service Decomposition Strategies
+| Question                        | Choose                                  | Why                                         |
+| ------------------------------- | --------------------------------------- | ------------------------------------------- |
+| Start with monolith or services? | Monolith first, extract later          | Boundaries are hard to guess up front       |
+| Sync or async call?              | Sync for queries, async for commands   | Match temporal coupling to caller need      |
+| One DB for all services?         | No — DB per service                    | Shared DB is the #1 source of coupling      |
+| Coordinate a multi-service txn?  | Saga (see `saga-orchestration` skill)  | Distributed 2PC is rarely worth the cost    |
+| Cross-cutting resilience?        | Service mesh if on K8s, library otherwise | Mesh moves retries/mTLS out of app code  |
 
-**By Business Capability**
+## Core patterns
 
-- Organize services around business functions
-- Each service owns its domain
-- Example: OrderService, PaymentService, InventoryService
+Sketches below — full code lives in the references.
 
-**By Subdomain (DDD)**
+### Service decomposition
 
-- Core domain, supporting subdomains
-- Bounded contexts map to services
-- Clear ownership and responsibility
+Align service boundaries with **business capabilities** or **DDD bounded contexts**. Extract from a monolith with the **strangler fig pattern** — proxy routes to old/new systems and migrate one capability at a time. See `references/decomposition.md`.
 
-**Strangler Fig Pattern**
+### API gateway and BFF
 
-- Gradually extract from monolith
-- New functionality as microservices
-- Proxy routes to old/new systems
+Single entry point that routes, aggregates, and applies cross-cutting policy (auth, rate limits, CORS). **Backend for Frontend (BFF)** is one gateway per client type (web, mobile, partner) so each stays tailored. See `references/decomposition.md`.
 
-### 2. Communication Patterns
+### Communication: sync vs async
 
-**Synchronous (Request/Response)**
+- **Sync (REST, gRPC)** — caller blocks until response. Simple, but temporal coupling means a downstream outage blocks callers.
+- **Async (events, queues)** — fire-and-forget via Kafka / RabbitMQ / SQS. Decouples in time, enables independent scaling.
 
-- REST APIs
-- gRPC
-- GraphQL
+Use gRPC for internal high-throughput calls, REST for public APIs, events for commands and notifications. See `references/communication-patterns.md`.
 
-**Asynchronous (Events/Messages)**
+### Data ownership
 
-- Event streaming (Kafka)
-- Message queues (RabbitMQ, SQS)
-- Pub/Sub patterns
+Each service owns its database. No cross-service SQL joins. Replicate read models via events when another service needs the data. Publish events reliably with the **outbox pattern** — write the event to an outbox table in the same transaction as the business change, then a relay ships it to the broker. See `references/data-management.md`.
 
-### 3. Data Management
+### Resilience
 
-**Database Per Service**
+- **Timeout** on every remote call — missing timeouts are the top cause of cascade failures.
+- **Retry with backoff + jitter** for transient failures only (5xx, timeouts — never 4xx).
+- **Circuit breaker** to fail fast when a dependency is sustained-unhealthy.
+- **Bulkhead** to isolate resource pools per downstream.
+- **Idempotency keys** so retries don't duplicate side effects.
 
-- Each service owns its data
-- No shared databases
-- Loose coupling
+See `references/resilience-patterns.md`.
 
-**Saga Pattern**
+### Observability
 
-- Distributed transactions
-- Compensating actions
-- Eventual consistency
+Emit a **correlation ID** per request and propagate it through every hop (HTTP header, event metadata). Use OpenTelemetry for **distributed tracing** across services. Expose **liveness** (`/health/live`) and **readiness** (`/health/ready`) probes for orchestrators. Combine with **service discovery** (Kubernetes DNS, Consul, Eureka) so clients find healthy instances dynamically. See `references/observability.md`.
 
-### 4. Resilience Patterns
+## Best practices
 
-**Circuit Breaker**
+- **Start with a modular monolith** — only split when team or scaling pain is real.
+- **One team per service** — Conway's law works with you or against you.
+- **Contract-first APIs** — OpenAPI / Protobuf / AsyncAPI; version from day one.
+- **Events as immutable facts** — include all data a consumer needs, not IDs to call back.
+- **Idempotent consumers** — at-least-once delivery means duplicates will happen.
+- **Automated pipelines** — per-service CI/CD, independent deploys.
+- **Observability before scaling** — traces, metrics, logs, SLOs before adding services.
 
-- Fail fast on repeated errors
-- Prevent cascade failures
+## Common pitfalls
 
-**Retry with Backoff**
+| Pitfall                    | Fix                                                     |
+| -------------------------- | ------------------------------------------------------- |
+| Distributed monolith       | Services sync-call each other in long chains — use events instead |
+| Shared database            | Replicate read models via events; keep writes isolated  |
+| Chatty services            | Aggregate at the gateway, or merge services that co-change |
+| No timeout on remote call  | Set explicit connect + read timeouts on every client    |
+| Synchronous everywhere     | Use events for commands that don't need an immediate answer |
+| No compensation logic      | Pair writes with a saga or outbox for reversibility     |
+| Premature microservices    | Start as a modular monolith; extract on real evidence   |
+| Ignoring network failures  | Assume every remote call can fail, hang, or duplicate   |
 
-- Transient fault handling
-- Exponential backoff
+## References — load on demand
 
-**Bulkhead**
+| File                                   | Load when                                                    |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `references/decomposition.md`          | splitting a monolith, designing boundaries, API gateway, BFF, service mesh, sidecar |
+| `references/communication-patterns.md` | choosing REST vs gRPC vs events, Kafka publish/consume, idempotent consumers, DLQ |
+| `references/data-management.md`        | DB-per-service, outbox pattern, CQRS, event sourcing, read replicas |
+| `references/resilience-patterns.md`    | circuit breaker, retry/backoff, bulkhead, timeouts, idempotency keys, health checks |
+| `references/observability.md`          | distributed tracing, correlation IDs, service discovery, metrics, logging |
 
-- Isolate resources
-- Limit impact of failures
+## Related skills
 
-## Service Decomposition Patterns
-
-### Pattern 1: By Business Capability
-
-```python
-# E-commerce example
-
-# Order Service
-class OrderService:
-    """Handles order lifecycle."""
-
-    async def create_order(self, order_data: dict) -> Order:
-        order = Order.create(order_data)
-
-        # Publish event for other services
-        await self.event_bus.publish(
-            OrderCreatedEvent(
-                order_id=order.id,
-                customer_id=order.customer_id,
-                items=order.items,
-                total=order.total
-            )
-        )
-
-        return order
-
-# Payment Service (separate service)
-class PaymentService:
-    """Handles payment processing."""
-
-    async def process_payment(self, payment_request: PaymentRequest) -> PaymentResult:
-        # Process payment
-        result = await self.payment_gateway.charge(
-            amount=payment_request.amount,
-            customer=payment_request.customer_id
-        )
-
-        if result.success:
-            await self.event_bus.publish(
-                PaymentCompletedEvent(
-                    order_id=payment_request.order_id,
-                    transaction_id=result.transaction_id
-                )
-            )
-
-        return result
-
-# Inventory Service (separate service)
-class InventoryService:
-    """Handles inventory management."""
-
-    async def reserve_items(self, order_id: str, items: List[OrderItem]) -> ReservationResult:
-        # Check availability
-        for item in items:
-            available = await self.inventory_repo.get_available(item.product_id)
-            if available < item.quantity:
-                return ReservationResult(
-                    success=False,
-                    error=f"Insufficient inventory for {item.product_id}"
-                )
-
-        # Reserve items
-        reservation = await self.create_reservation(order_id, items)
-
-        await self.event_bus.publish(
-            InventoryReservedEvent(
-                order_id=order_id,
-                reservation_id=reservation.id
-            )
-        )
-
-        return ReservationResult(success=True, reservation=reservation)
-```
-
-### Pattern 2: API Gateway
-
-```python
-import asyncio
-from fastapi import FastAPI, HTTPException, Depends
-import httpx
-from circuitbreaker import circuit
-
-app = FastAPI()
-
-class APIGateway:
-    """Central entry point for all client requests."""
-
-    def __init__(self):
-        self.order_service_url = "http://order-service:8000"
-        self.payment_service_url = "http://payment-service:8001"
-        self.inventory_service_url = "http://inventory-service:8002"
-        self.http_client = httpx.AsyncClient(timeout=5.0)
-
-    @circuit(failure_threshold=5, recovery_timeout=30)
-    async def call_order_service(self, path: str, method: str = "GET", **kwargs):
-        """Call order service with circuit breaker."""
-        response = await self.http_client.request(
-            method,
-            f"{self.order_service_url}{path}",
-            **kwargs
-        )
-        response.raise_for_status()
-        return response.json()
-
-    @circuit(failure_threshold=5, recovery_timeout=30)
-    async def call_payment_service(self, path: str, method: str = "GET", **kwargs):
-        """Call payment service with circuit breaker."""
-        response = await self.http_client.request(
-            method,
-            f"{self.payment_service_url}{path}",
-            **kwargs
-        )
-        response.raise_for_status()
-        return response.json()
-
-    @circuit(failure_threshold=5, recovery_timeout=30)
-    async def call_inventory_service(self, path: str, method: str = "GET", **kwargs):
-        """Call inventory service with circuit breaker."""
-        response = await self.http_client.request(
-            method,
-            f"{self.inventory_service_url}{path}",
-            **kwargs
-        )
-        response.raise_for_status()
-        return response.json()
-
-    async def create_order_aggregate(self, order_id: str) -> dict:
-        """Aggregate data from multiple services."""
-        # Parallel requests
-        order, payment, inventory = await asyncio.gather(
-            self.call_order_service(f"/orders/{order_id}"),
-            self.call_payment_service(f"/payments/order/{order_id}"),
-            self.call_inventory_service(f"/reservations/order/{order_id}"),
-            return_exceptions=True
-        )
-
-        # Handle partial failures
-        result = {"order": order}
-        if not isinstance(payment, Exception):
-            result["payment"] = payment
-        if not isinstance(inventory, Exception):
-            result["inventory"] = inventory
-
-        return result
-
-@app.post("/api/orders")
-async def create_order(
-    order_data: dict,
-    gateway: APIGateway = Depends()
-):
-    """API Gateway endpoint."""
-    try:
-        # Route to order service
-        order = await gateway.call_order_service(
-            "/orders",
-            method="POST",
-            json=order_data
-        )
-        return {"order": order}
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=503, detail="Order service unavailable")
-```
-
-## Communication Patterns
-
-Services communicate through synchronous or asynchronous channels. The choice depends on coupling tolerance and latency requirements:
-
-- **Synchronous (REST/gRPC)**: Direct request-response. Simple but creates temporal coupling — the caller blocks until the callee responds.
-- **Asynchronous (Events/Messages)**: Publish events to a broker (Kafka, RabbitMQ). Decouples services in time and allows independent scaling.
-
-**Rule of thumb**: Use synchronous for queries where the caller needs an immediate answer. Use asynchronous for commands where the caller just needs to know the work will eventually happen.
-
-For implementation patterns with code examples (REST clients with retries, Kafka EventBus, gRPC), see `references/communication-patterns.md`.
-
-## Resilience Patterns
-
-Distributed systems fail partially. These patterns prevent cascading failures:
-
-- **Circuit Breaker**: Track failures to a downstream service. After a threshold, "open" the circuit and fail fast instead of waiting for timeouts. Periodically test if the service recovered.
-- **Retry with Backoff**: Retry transient failures with exponential delays (e.g., 1s, 2s, 4s). Cap retries to avoid overwhelming a struggling service.
-- **Bulkhead**: Isolate resources per downstream service (e.g., separate connection pools). A failure in one dependency doesn't exhaust resources for others.
-
-For implementations including a full CircuitBreaker class, retry patterns with tenacity, and bulkhead with asyncio.Semaphore, see `references/resilience-patterns.md`.
-
-## Best Practices
-
-1. **Service Boundaries**: Align with business capabilities
-2. **Database Per Service**: No shared databases
-3. **API Contracts**: Versioned, backward compatible
-4. **Async When Possible**: Events over direct calls
-5. **Circuit Breakers**: Fail fast on service failures
-6. **Distributed Tracing**: Track requests across services
-7. **Service Registry**: Dynamic service discovery
-8. **Health Checks**: Liveness and readiness probes
-
-## Common Pitfalls
-
-- **Distributed Monolith**: Tightly coupled services
-- **Chatty Services**: Too many inter-service calls
-- **Shared Databases**: Tight coupling through data
-- **No Circuit Breakers**: Cascade failures
-- **Synchronous Everything**: Tight coupling, poor resilience
-- **Premature Microservices**: Starting with microservices
-- **Ignoring Network Failures**: Assuming reliable network
-- **No Compensation Logic**: Can't undo failed transactions
-
-## Related Skills
-
-- **api-design-principles**: When designing the REST or GraphQL APIs that your microservices expose — covers resource modeling, pagination, error handling, and versioning
-- **saga-orchestration**: When coordinating distributed transactions across services — covers both orchestration and choreography approaches with compensating actions
+- `api-design-principles` — REST / GraphQL contract design for service APIs
+- `saga-orchestration` — distributed transactions with compensating actions
+- `error-handling-patterns` — exception shaping and retry/backoff/fallback internals
+- `logging-standards` — structured logs that stay traceable across services

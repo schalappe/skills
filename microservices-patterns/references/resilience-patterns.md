@@ -101,6 +101,48 @@ async def call_payment_service(payment_data: dict):
 
 ---
 
+## Timeouts
+
+A remote call with no timeout is a resource leak waiting to happen. When the downstream hangs, every caller thread/connection blocks until the OS eventually tears it down — typically minutes. By that time the upstream is overloaded and the failure has cascaded.
+
+**Always set two timeouts on an HTTP client:**
+
+- **Connect timeout** — max time to open the TCP/TLS connection. 1–3 seconds is usually enough.
+- **Read timeout** — max time to wait for bytes after the connection is open. Tune to the downstream's p99 latency × 2.
+
+```python
+import httpx
+
+client = httpx.AsyncClient(
+    timeout=httpx.Timeout(
+        connect=2.0,   # fail fast if we can't dial in
+        read=5.0,      # fail if no bytes for 5s
+        write=5.0,
+        pool=1.0,      # wait at most 1s for a free connection from the pool
+    )
+)
+```
+
+**Per-request override** when a specific call needs different limits:
+
+```python
+await client.post("/slow-report", json=data, timeout=30.0)
+```
+
+**gRPC** has no default deadline — you must set one on every call:
+
+```python
+stub.GetOrder(GetOrderRequest(order_id="42"), timeout=2.0)
+```
+
+**Key considerations:**
+
+- A timeout shorter than the downstream's p99 will generate spurious failures. Measure before tuning.
+- The total end-to-end budget is the **sum** of timeouts along the call chain — don't let a chain of 5s timeouts turn a 2s user expectation into a 25s hang.
+- Combine with retries: total budget = `attempts × (connect + read)`. A 3-retry, 5s-timeout client can block for 15s.
+
+---
+
 ## Retry with Exponential Backoff
 
 Retries transient failures with increasing delays between attempts. Prevents overwhelming a struggling service with immediate retries.
@@ -249,6 +291,53 @@ async def check_inventory(product_id: str):
 - Combine with circuit breakers — the bulkhead limits concurrency, the circuit breaker detects sustained failures
 - Use `asyncio.wait_for` with a timeout on semaphore acquisition to fail fast when the bulkhead is full
 - Monitor bulkhead utilization to tune limits over time
+
+---
+
+## Idempotency Keys
+
+Retries (network-level, library-level, or user-triggered) mean any write can be attempted more than once. Without protection, a duplicate `POST /payments` charges the customer twice.
+
+**Pattern:** the client generates a unique **idempotency key** per logical operation and sends it as a header. The server records `(key, response)` on first success; subsequent requests with the same key return the stored response without re-executing.
+
+```python
+import hashlib
+from fastapi import FastAPI, Header, HTTPException, Request
+
+app = FastAPI()
+
+@app.post("/payments")
+async def create_payment(
+    request: Request,
+    payment: PaymentRequest,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+):
+    body_hash = hashlib.sha256(await request.body()).hexdigest()
+
+    stored = await idempotency_store.get(idempotency_key)
+    if stored:
+        # Guard against key reuse with a different body
+        if stored["body_hash"] != body_hash:
+            raise HTTPException(status_code=422, detail="Idempotency key reused with different body")
+        return stored["response"]
+
+    # First-time execution
+    result = await payment_service.charge(payment)
+    await idempotency_store.put(
+        idempotency_key,
+        {"body_hash": body_hash, "response": result},
+        ttl_seconds=24 * 3600,
+    )
+    return result
+```
+
+**Key considerations:**
+
+- **Scope keys per endpoint or per user** — two different operations should never share a key.
+- **Store the request hash alongside the response** so you can reject reuse with a different body (422, not 200).
+- **TTL the store** — 24 hours is typical. Infinite retention wastes storage.
+- **Atomic first-write** — use `INSERT ... ON CONFLICT DO NOTHING` (Postgres) or `SETNX` (Redis) so concurrent first attempts don't both execute.
+- For event consumers, the equivalent is **deduplication on `event_id`** — maintain a "processed events" set and skip duplicates.
 
 ---
 

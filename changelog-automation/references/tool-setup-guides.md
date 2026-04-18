@@ -9,7 +9,10 @@ Step-by-step setup guides for changelog automation tools.
 - [semantic-release](#semantic-release)
 - [GitHub Actions Workflows](#github-actions-workflows)
 - [git-cliff](#git-cliff)
+- [cocogitto](#cocogitto)
 - [commitizen (Python)](#commitizen-python)
+
+> Monorepo-specific tools (changesets, release-please manifest mode) live in [monorepo-releases.md](./monorepo-releases.md).
 
 ## Commit Linting
 
@@ -379,6 +382,124 @@ git cliff v1.0.0..v2.0.0 -o RELEASE_NOTES.md
 
 # Preview without writing
 git cliff --unreleased --dry-run
+```
+
+## cocogitto
+
+Rust-based opinionated pipeline. `cog` enforces Conventional Commits, bumps versions, writes the changelog, tags, and runs hooks in one command. Language-agnostic.
+
+```bash
+# Install
+cargo install --locked cocogitto
+# or via homebrew
+brew install cocogitto
+
+# Initialize config + hooks in repo
+cog init
+```
+
+### Configuration
+
+```toml
+# cog.toml
+tag_prefix = "v"
+branch_whitelist = ["main", "release/**"]
+
+ignore_merge_commits = true
+generate_mono_repository_global_tag = false
+
+[changelog]
+path = "CHANGELOG.md"
+authors = [
+    { signature = "Alice", username = "alice" },
+]
+
+[bump_profiles.default]
+pre_bump_hooks = [
+    "cargo build --release",
+    "cargo test",
+]
+post_bump_hooks = [
+    "git push",
+    "git push origin {{version}}",
+]
+
+[commit_types]
+hotfix = { changelog_title = "Hotfixes" }
+chore = { changelog_title = "Chores", omit_from_changelog = true }
+```
+
+### Usage
+
+```bash
+# Create a conventional commit interactively
+cog commit feat "add oauth login" auth
+
+# Verify history follows Conventional Commits
+cog check
+
+# Bump version automatically (scans commits since last tag)
+cog bump --auto
+
+# Specific bump
+cog bump --patch
+cog bump --minor
+cog bump --major
+
+# Generate changelog without bumping
+cog changelog --at v1.2.0 -t full_hash > RELEASE_NOTES.md
+```
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Conventional commits check
+        uses: cocogitto/cocogitto-action@v4
+
+  release:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Semver release
+        id: release
+        uses: cocogitto/cocogitto-action@v4
+        with:
+          release: true
+          git-user: "Cog Bot"
+          git-user-email: "release@example.org"
+
+      - name: Generate release notes
+        run: cog changelog --at ${{ steps.release.outputs.version }} -t full_hash > RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          tag_name: ${{ steps.release.outputs.version }}
 ```
 
 ## commitizen (Python)

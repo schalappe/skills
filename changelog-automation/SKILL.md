@@ -9,46 +9,43 @@ Patterns and tools for automating changelog generation, release notes, and versi
 
 ## Agent Workflow
 
-Follow these steps when invoked:
+### Step 1: Assess
 
-### Step 1: Assess the Project
+1. **Ecosystem** — read `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod` to infer language + package manager
+2. **Existing setup** — grep for `commitlint`, `semantic-release`, `release-please`, `git-cliff`, `changesets`, `cocogitto`, `commitizen`
+3. **Commit history** — `git log --oneline -20` to see if repo already follows Conventional Commits
+4. **Changelog** — look for `CHANGELOG.md`, `HISTORY.md`, `RELEASES.md`
+5. **Monorepo signals** — `pnpm-workspace.yaml`, `packages/*`, `workspaces` in `package.json`, Cargo workspace → jump to [monorepo-releases.md](references/monorepo-releases.md)
 
-1. **Identify the ecosystem** — Read `package.json`, `pyproject.toml`, `Cargo.toml`, or other config files to determine the language and package manager
-2. **Check existing setup** — Grep for `commitlint`, `semantic-release`, `release-please`, `git-cliff`, or `commitizen` in config files and dependencies
-3. **Review commit history** — Run `git log --oneline -20` to see if the project already follows conventional commits
-4. **Check for existing changelog** — Look for `CHANGELOG.md`, `HISTORY.md`, or `RELEASES.md`
+### Step 2: Pick a tool
 
-### Step 2: Choose a Tool
+Categorize by **workflow style**, not language. All tools below work on any Conventional Commits repo unless noted.
 
-Use this decision framework based on project needs:
-
-| Project Type | Recommended Tool | Why |
-| --- | --- | --- |
-| Node.js library (npm publish) | semantic-release | Full automation: versioning, npm publish, GitHub releases |
-| Node.js app (no publish) | release-please | Generates release PRs with changelog and version bumps |
-| Rust project | git-cliff | Fast, native Rust, flexible Tera templates |
-| Python project | commitizen | Native Python, pyproject.toml integration |
-| Any project (CI-first) | release-please via GitHub Actions | Language-agnostic, works with any project |
-| Monorepo | release-please or semantic-release | Both support multi-package workspaces |
+| Project profile                           | Recommended tool  | Why                                                                  |
+| ----------------------------------------- | ----------------- | -------------------------------------------------------------------- |
+| JS/TS library published to npm            | semantic-release  | Analyze → bump → publish → GitHub release in one pass                |
+| JS/TS monorepo (workspace publishing)     | changesets        | Opt-in changeset files per PR, per-package bumps, fixed/linked groups |
+| Polyglot app or lib (release-PR flow)     | release-please    | Language-agnostic release PR; Node/Python/Rust/Go/simple types       |
+| Any repo (changelog only, bring-your-own) | git-cliff         | Fast, template-driven; no opinions on bump/tag/publish               |
+| Any repo (opinionated CLI + CI)           | cocogitto (`cog`) | `cog bump` enforces commits, tags, writes changelog, runs hooks      |
+| Python with native pyproject integration  | commitizen        | `cz bump`, `cz commit`, `version_files`, Python-first                |
 
 ### Step 3: Implement
 
-1. **Set up commit linting** — Install commitlint + husky to enforce Conventional Commits (see `references/tool-setup-guides.md`)
-2. **Configure the chosen tool** — Follow the setup guide for the selected tool in `references/tool-setup-guides.md`
-3. **Add CI workflow** — Set up GitHub Actions for automated releases if the user wants CI integration
-4. **Create initial changelog** — Generate a CHANGELOG.md from existing commits if possible
+1. **Commit linting** — install commitlint + husky (Node), or use `cz check` / `cog check` for Python + polyglot repos
+2. **Configure the tool** — see [tool-setup-guides.md](references/tool-setup-guides.md)
+3. **CI workflow** — add GitHub Actions for automated releases if requested
+4. **Seed changelog** — generate initial `CHANGELOG.md` from existing history
 
 ### Step 4: Verify
 
 1. Test commit linting with a properly formatted commit
-2. Run a dry-run release to verify changelog generation
-3. Confirm the generated changelog follows Keep a Changelog format
+2. Dry-run release to verify changelog generation
+3. Confirm output follows [Keep a Changelog](https://keepachangelog.com/)
 
 ## Core Concepts
 
-### 1. Keep a Changelog Format
-
-The standard format for human-readable changelogs:
+### Keep a Changelog format
 
 ```markdown
 # Changelog
@@ -69,7 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - User profile avatars
-- Dark mode support
 
 ### Changed
 
@@ -87,74 +83,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.2.0]: https://github.com/user/repo/compare/v1.1.0...v1.2.0
 ```
 
-### 2. Conventional Commits
+Sections: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+
+### Conventional Commits
 
 ```text
-<type>[optional scope]: <description>
+<type>[optional scope][!]: <description>
 
 [optional body]
 
 [optional footer(s)]
 ```
 
-| Type       | Description      | Changelog Section  |
-| ---------- | ---------------- | ------------------ |
-| `feat`     | New feature      | Added              |
-| `fix`      | Bug fix          | Fixed              |
-| `docs`     | Documentation    | (usually excluded) |
-| `style`    | Formatting       | (usually excluded) |
-| `refactor` | Code restructure | Changed            |
-| `perf`     | Performance      | Changed            |
-| `test`     | Tests            | (usually excluded) |
-| `chore`    | Maintenance      | (usually excluded) |
-| `ci`       | CI changes       | (usually excluded) |
-| `build`    | Build system     | (usually excluded) |
-| `revert`   | Revert commit    | Removed            |
+| Type       | Meaning          | Changelog section |
+| ---------- | ---------------- | ----------------- |
+| `feat`     | New feature      | Added             |
+| `fix`      | Bug fix          | Fixed             |
+| `perf`     | Performance      | Changed           |
+| `refactor` | Code restructure | Changed           |
+| `docs`     | Documentation    | (excluded)        |
+| `style`    | Formatting       | (excluded)        |
+| `test`     | Tests            | (excluded)        |
+| `chore`    | Maintenance      | (excluded)        |
+| `ci`       | CI changes       | (excluded)        |
+| `build`    | Build system     | (excluded)        |
 
-### 3. Semantic Versioning
+Breaking change: append `!` (e.g. `feat(api)!:`) OR add `BREAKING CHANGE:` footer. Drives MAJOR bump.
+
+### Semantic Versioning
 
 ```text
 MAJOR.MINOR.PATCH
 
-MAJOR: Breaking changes (feat! or BREAKING CHANGE footer)
-MINOR: New features (feat)
-PATCH: Bug fixes (fix)
+MAJOR: breaking changes (feat! or BREAKING CHANGE footer)
+MINOR: new features (feat)
+PATCH: bug fixes (fix, perf)
 ```
 
 ## Best Practices
 
-### Do's
+**Do**
 
-- **Follow Conventional Commits** — Enables all automation tools
-- **Write clear commit messages** — Future maintainers will thank you
-- **Reference issues** — Link commits to tickets with `Fixes #123`
-- **Use scopes consistently** — Define team conventions for scope names
-- **Automate releases** — Reduce manual errors and forgotten steps
+- Enforce Conventional Commits in CI (commitlint, `cog check`, `cz check`)
+- Reference issues in commits: `Fixes #123`, `Closes #456`
+- Keep scopes consistent across a repo (document the allowed list)
+- Let automation write the changelog — never edit generated entries by hand
+- Mark breaking changes with `!` or `BREAKING CHANGE:` footer
 
-### Don'ts
+**Don't**
 
-- **Don't mix unrelated changes** — One logical change per commit
-- **Don't skip commit validation** — Use commitlint to enforce conventions
-- **Don't manually edit generated changelogs** — Automation-generated only
-- **Don't forget breaking changes** — Mark with `!` suffix or `BREAKING CHANGE` footer
-- **Don't ignore CI validation** — Validate commit messages in the pipeline
+- Mix unrelated changes in one commit (one logical change per commit)
+- Hand-edit release commits (bots will overwrite you)
+- Skip commit validation locally then fight CI
+- Forget the manifest file (release-please, `.release-please-manifest.json`) — most common cause of broken release PRs
 
-## Reference Files
+## References
 
-For tool-specific setup and configuration:
-
-- **`references/tool-setup-guides.md`** — Step-by-step setup for commitlint, release-please, semantic-release, git-cliff, commitizen, and GitHub Actions workflows
-- **`references/templates-and-examples.md`** — Release note templates (GitHub and internal) and commit message examples
-
-Load references when implementing a specific tool or when the user needs templates for release notes.
+- [tool-setup-guides.md](references/tool-setup-guides.md) — commitlint, semantic-release, release-please, git-cliff, cocogitto, commitizen + GitHub Actions workflows
+- [monorepo-releases.md](references/monorepo-releases.md) — changesets, release-please manifest mode, fixed/linked groups, snapshot releases
+- [templates-and-examples.md](references/templates-and-examples.md) — release note templates + commit message examples
 
 ## External Resources
 
 - [Keep a Changelog](https://keepachangelog.com/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Semantic Versioning](https://semver.org/)
+- [Changesets](https://github.com/changesets/changesets)
+- [Cocogitto](https://docs.cocogitto.io/)
 
 ## Related Skills
 
-- **codebase-documenter** — General project documentation
-- **openapi-spec-generation** — API specification patterns
+- **codebase-documenter** — project documentation
+- **api-design-principles** — API + webhook versioning

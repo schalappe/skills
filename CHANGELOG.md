@@ -11,4 +11,5 @@ and follows [Conventional Commits](https://www.conventionalcommits.org/).
 ### Added
 
 - Add 11 engineering skills with progressive-disclosure references (#2)
+- Add 4 workflow skills for plan/verify/finish loop (#3)
 

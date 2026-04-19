@@ -16,4 +16,5 @@ and follows [Conventional Commits](https://www.conventionalcommits.org/).
 ### Changed
 
 - Expand README and add MIT license (#4) (#4)
+- **codebase-documenter**: Simplify skill description
 

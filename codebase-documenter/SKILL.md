@@ -1,6 +1,6 @@
 ---
 name: codebase-documenter
-description: Create project documentation: READMEs, architecture guides, API references, ADRs, runbooks, onboarding material, CONTRIBUTING guides, module/package overviews, and inline code comments. Use when documenting a project, writing a README, explaining project structure, adding code comments, producing a code walkthrough, or when the user asks "how does this codebase work?" — even without the word "documentation." Out of scope: OpenAPI specs (see openapi-spec-generation) and release notes (see changelog-automation).
+description: Create project documentation like READMEs, architecture guides, API references, ADRs, runbooks, onboarding material, CONTRIBUTING guides, module/package overviews, and inline code comments. Use when documenting a project, writing a README, explaining project structure, adding code comments, producing a code walkthrough, or when the user asks "how does this codebase work?" — even without the word "documentation."
 ---
 
 # Codebase Documenter
